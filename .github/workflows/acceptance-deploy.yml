@@ -39,7 +39,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ./tfplan_acceptance # Name of the artifact
-          path: ${{ env.TF_WORKING_DIR }}/tfplan_acceptance # Path to the binary plan file
+          path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
           retention-days: 1 # Retain artifact for 1 day
       - name: Post PR comment
         uses: borchero/terraform-plan-comment@3399d8dbae8b05185e815e02361ede2949cd99c4 # v2
