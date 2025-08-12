@@ -3,6 +3,7 @@ name: Manual Hello World
 on:
   workflow_dispatch:
   push:
+    on_branches:
     - main
 
 jobs:
