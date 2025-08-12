@@ -59,6 +59,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tfplan_acceptance # Name of the artifact
+          path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
       - name: "Terraform Apply (Acceptance)"
         run: terraform apply tfplan_acceptance # Apply the specific plan file
         working-directory: ${{ env.TF_WORKING_DIR }}
