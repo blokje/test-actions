@@ -6,6 +6,12 @@ on:
       run_apply:
         required: true
         type: boolean
+  workflow_dispatch: 
+    inputs:
+      run_apply:
+        description: "Run this workflow!"
+        required: true
+        type: boolean
 
 env:
   TF_WORKING_DIR: environments/acceptance
@@ -15,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     if: inputs.run_apply == true # Only run apply if explicitly told to by the calling workflow
     environment:
-      name: acceptance
+      name: acceptance # Associate with GitHub Environment for protection/visibility
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -29,6 +35,20 @@ jobs:
       - name: "Terraform Plan (Acceptance)"
         run: terraform plan -out=tfplan_acceptance # Generate fresh plan based on current main branch code
         working-directory: ${{ env.TF_WORKING_DIR }}
-      - name: "Terraform Apply (Acceptance)"
-        run: terraform apply tfplan_acceptance # Apply the specific plan file
-        working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Upload Terraform Plan Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ./tfplan_acceptance # Name of the artifact
+          path: ${{ env.TF_WORKING_DIR }}/tfplan_acceptance # Path to the binary plan file
+          retention-days: 1 # Retain artifact for 1 day
+      - name: Post PR comment
+        uses: borchero/terraform-plan-comment@3399d8dbae8b05185e815e02361ede2949cd99c4 # v2
+        with:
+          token: ${{ github.token }}
+          working-directory: ${{ env.TF_WORKING_DIR }}
+          planfile: .planfile
+
+
+    #   - name: "Terraform Apply (Acceptance)"
+    #     run: terraform apply tfplan_acceptance # Apply the specific plan file
+    #     working-directory: ${{ env.TF_WORKING_DIR }}
