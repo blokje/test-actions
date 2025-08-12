@@ -1,3 +1,5 @@
+name: "Terraform Deploy Orchestrator"
+
 on:
   push:
     branches:
