@@ -20,8 +20,6 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     if: inputs.run_apply == true # Only run apply if explicitly told to by the calling workflow
-    environment:
-      name: acceptance # Associate with GitHub Environment for protection/visibility
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -41,14 +39,26 @@ jobs:
           name: tfplan_acceptance # Name of the artifact
           path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
           retention-days: 1 # Retain artifact for 1 day
-      - name: Post PR comment
-        uses: borchero/terraform-plan-comment@3399d8dbae8b05185e815e02361ede2949cd99c4 # v2
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: apply
+    environment:
+      name: acceptance # Associate with GitHub Environment for protection/visibility
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
         with:
-          token: ${{ github.token }}
-          working-directory: ${{ env.TF_WORKING_DIR }}
-          planfile: .planfile
-
-
-    #   - name: "Terraform Apply (Acceptance)"
-    #     run: terraform apply tfplan_acceptance # Apply the specific plan file
-    #     working-directory: ${{ env.TF_WORKING_DIR }}
+          terraform_version: "1.7.5"
+      - name: "Terraform Init (Acceptance)"
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Download Terraform Plan Artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan_acceptance # Name of the artifact
+      - name: "Terraform Apply (Acceptance)"
+        run: terraform apply tfplan_acceptance # Apply the specific plan file
+        working-directory: ${{ env.TF_WORKING_DIR }}
