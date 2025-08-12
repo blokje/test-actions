@@ -38,7 +38,7 @@ jobs:
       - name: "Upload Terraform Plan Artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: ./tfplan_acceptance # Name of the artifact
+          name: tfplan_acceptance # Name of the artifact
           path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
           retention-days: 1 # Retain artifact for 1 day
       - name: Post PR comment
