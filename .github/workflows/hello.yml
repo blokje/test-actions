@@ -12,3 +12,16 @@ jobs:
     steps:
       - name: Say Hello
         run: echo "Hello, world!"
+
+  deploy_to_acceptance:
+    runs-on: ubuntu-latest
+    
+    # This is the key change: specifying the environment
+    environment: 
+      name: acceptance
+
+    steps:
+      - name: Deploy to Acceptance
+        run: |
+          echo "Simulating a deployment to the acceptance environment."
+          echo "Hello, world!"
