@@ -6,6 +6,12 @@ on:
       run_apply:
         required: true
         type: boolean
+  workflow_dispatch: 
+    inputs:
+      run_apply:
+        description: "Run this workflow!"
+        required: true
+        type: boolean
 
 env:
   TF_WORKING_DIR: environments/production
@@ -14,8 +20,6 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     if: inputs.run_apply == true # Only run apply if explicitly told to by the calling workflow
-    environment:
-      name: production
     steps:
       - name: "Checkout repository"
         uses: actions/checkout@v4
@@ -29,6 +33,33 @@ jobs:
       - name: "Terraform Plan (Production)"
         run: terraform plan -out=tfplan_production # Generate fresh plan based on current main branch code
         working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Upload Terraform Plan Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan_production # Name of the artifact
+          path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
+          retention-days: 1 # Retain artifact for 1 day
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: apply
+    environment:
+      name: production # Associate with GitHub Environment for protection/visibility
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: "Terraform Init (Production)"
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Download Terraform Plan Artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan_production # Name of the artifact
+          path: ${{ env.TF_WORKING_DIR }} # Path to the binary plan file
       - name: "Terraform Apply (Production)"
         run: terraform apply tfplan_production # Apply the specific plan file
         working-directory: ${{ env.TF_WORKING_DIR }}
