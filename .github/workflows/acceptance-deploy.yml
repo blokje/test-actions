@@ -1,0 +1,34 @@
+name: "Acceptance Terraform Deploy"
+
+on:
+  workflow_call:
+    inputs:
+      run_apply:
+        required: true
+        type: boolean
+
+env:
+  TF_WORKING_DIR: environments/acceptance
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    if: inputs.run_apply == true # Only run apply if explicitly told to by the calling workflow
+    environment:
+      name: acceptance
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: "Terraform Init (Acceptance)"
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Terraform Plan (Acceptance)"
+        run: terraform plan -out=tfplan_acceptance # Generate fresh plan based on current main branch code
+        working-directory: ${{ env.TF_WORKING_DIR }}
+      - name: "Terraform Apply (Acceptance)"
+        run: terraform apply tfplan_acceptance # Apply the specific plan file
+        working-directory: ${{ env.TF_WORKING_DIR }}

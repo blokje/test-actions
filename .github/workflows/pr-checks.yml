@@ -1,0 +1,107 @@
+# This workflow is specifically for Pull Requests targeting the `main` branch. 
+# Its purpose is to perform syntax validation, formatting checks, and generate
+# a Terraform plan for both environments, providing immediate feedback to 
+# developers and reviewers. It does not deploy anything and does not create
+# artifacts for later use.
+
+name: "PR Terraform Checks & Plans"
+
+on:
+  pull_request:
+    branches:
+      - main # Run these checks on any PR targeting the main branch
+
+jobs:
+  # This job will detect changes first, so other jobs can use its outputs.
+  detect_pr_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      acceptance_changed: ${{ steps.check_paths.outputs.acceptance_changed }}
+      production_changed: ${{ steps.check_paths.outputs.production_changed }}
+      modules_changed: ${{ steps.check_paths.outputs.modules_changed }}
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+
+      - name: "Get changed files and set outputs"
+        id: check_paths
+        run: |
+          # Determine the base commit for the diff, robust for PRs
+          # For pull_request event, use github.event.pull_request.base.sha
+          BASE_SHA=${{ github.event.pull_request.base.sha }}
+          HEAD_SHA=${{ github.sha }}
+
+          echo "Diffing from Base SHA: $BASE_SHA to Head SHA: $HEAD_SHA"
+
+          # Get changed files between the base of the PR and the current commit
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "All changed files: $CHANGED_FILES"
+          echo "All changed files: $CHANGED_FILES"
+          # ... then use grep or similar to check for specific paths
+          if echo "$CHANGED_FILES" | grep -q "^environments/acceptance/"; then
+            echo "acceptance_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED_FILES" | grep -q "^environments/production/"; then
+            echo "production_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+          if echo "$CHANGED_FILES" | grep -q "^modules/"; then
+            echo "modules_changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  terraform_checks_acceptance:
+    runs-on: ubuntu-latest
+    needs: detect_pr_changes
+    if: ${{ needs.detect_pr_changes.outputs.acceptance_changed == 'true' || needs.detect_pr_changes.outputs.modules_changed == 'true' }}
+    env:
+      TF_WORKING_DIR: environments/acceptance
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: "Terraform Init (Acceptance)"
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: "Terraform Format Check (Acceptance)"
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: "Terraform Validate (Acceptance)"
+        run: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        
+      - name: "Terraform Plan (Acceptance)"
+        run: terraform plan -no-color
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+  terraform_checks_production:
+    runs-on: ubuntu-latest
+    needs: detect_pr_changes # Depend on detect_pr_changes to get outputs
+    if: ${{ needs.detect_pr_changes.outputs.production_changed == 'true' || needs.detect_pr_changes.outputs.modules_changed == 'true' }}
+    env:
+      TF_WORKING_DIR: environments/production
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+      - name: "Terraform Init (Production)"
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: "Terraform Format Check (Production)"
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: "Terraform Validate (Production)"
+        run: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: "Terraform Plan (Production)"
+        run: terraform plan -no-color
+        working-directory: ${{ env.TF_WORKING_DIR }}

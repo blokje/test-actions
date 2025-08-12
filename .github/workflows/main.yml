@@ -1,0 +1,57 @@
+on:
+  push:
+    branches:
+      - main # Trigger apply only when changes are merged/pushed directly to main
+
+jobs:
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      acceptance_deploy_needed: ${{ steps.check_paths.outputs.acceptance_changed }}
+      production_deploy_needed: ${{ steps.check_paths.outputs.production_changed }}
+      modules_changed: ${{ steps.check_paths.outputs.modules_changed }}
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Get changed files and set outputs"
+        id: check_paths
+        run: |
+          # Use git diff to get changed files between the previous and current commit
+          # This handles merges correctly by looking at the diff from the merge base.
+          CHANGED_FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          echo "All changed files: $CHANGED_FILES"
+
+          # Check if specific paths are present in the changed files
+          if echo "$CHANGED_FILES" | grep -q "^environments/acceptance/"; then
+            echo "acceptance_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "acceptance_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^environments/production/"; then
+            echo "production_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "production_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if echo "$CHANGED_FILES" | grep -q "^modules/"; then
+            echo "modules_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "modules_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  call_acceptance_deploy:
+    needs: detect_changes
+    # Trigger acceptance deploy if acceptance env files or shared modules changed
+    if: ${{ needs.detect_changes.outputs.acceptance_deploy_needed == 'true' || needs.detect_changes.outputs.modules_changed == 'true' }}
+    uses: ./.github/workflows/acceptance-deploy.yml # Call the reusable workflow for acceptance
+    with:
+      run_apply: true # Always run apply for acceptance if this job is triggered
+
+  call_production_deploy:
+    needs:
+      - detect_changes
+    if: ${{ needs.detect_changes.outputs.production_deploy_needed == 'true' || needs.detect_changes.outputs.modules_changed == 'true' }}
+    uses: ./.github/workflows/production-deploy.yml # Call the reusable workflow for production
+    with:
+      run_apply: true # Always run apply for production if this job is triggered
